@@ -358,7 +358,7 @@ resource "nsxt_policy_security_policy" "allow_3TA" {
 
   rule {
     display_name       = "App to DB Servers"
-    source_groups      = [nsxt_policy_group.app_servers.path, nsxt_policy_group.app_vip.path, nsxt_policy_group.avi_se_data.path]
+    source_groups      = [nsxt_policy_group.app_servers.path, nsxt_policy_group.avi_se_data.path]
     destination_groups = [nsxt_policy_group.db_servers.path]
     action             = "ALLOW"
     services           = [data.nsxt_policy_service.mysql.path]
