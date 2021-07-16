@@ -126,7 +126,6 @@ resource "nsxt_policy_bgp_neighbor" "router_a" {
   remote_as_num    = var.router_a_remote_as
   hold_down_time   = var.hold_down_time
   keep_alive_time  = var.keep_alive_time
-  source_addresses = local.peer_a_source_addresses
 }
 
 # Create Tier-1 Gateway
@@ -142,11 +141,6 @@ resource "nsxt_policy_tier1_gateway" "tf-tier1-gw" {
   # force_whitelisting        = "false"
   tier0_path                = nsxt_policy_tier0_gateway.tf-tier0-gw.path
   route_advertisement_types = ["TIER1_STATIC_ROUTES", "TIER1_CONNECTED"]
-
-  tag {
-    scope = "color"
-    tag   = "blue"
-  }
 
   route_advertisement_rule {
     name                      = "Tier 1 Networks"
@@ -364,7 +358,7 @@ resource "nsxt_policy_security_policy" "allow_3TA" {
 
   rule {
     display_name       = "App to DB Servers"
-    source_groups      = [nsxt_policy_group.app_servers.path, nsxt_policy_group.avi_se_data.path]
+    source_groups      = [nsxt_policy_group.app_servers.path, nsxt_policy_group.app_vip.path, nsxt_policy_group.avi_se_data.path]
     destination_groups = [nsxt_policy_group.db_servers.path]
     action             = "ALLOW"
     services           = [data.nsxt_policy_service.mysql.path]
