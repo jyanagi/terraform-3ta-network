@@ -47,12 +47,20 @@ data "nsxt_policy_edge_node" "edge_node_2" {
 
 
 # Create NSX-T VLAN Segments
-resource "nsxt_policy_vlan_segment" "nsx-vlan-2811-seg" {
-  display_name        = "nsx-vlan-2811-seg"
+resource "nsxt_policy_vlan_segment" "nsx-vlan-fa-seg" {
+  display_name        = var.segment_fa_vlan_name
   description         = "VLAN Segment created by Terraform"
   transport_zone_path = data.nsxt_policy_transport_zone.vlan_tz.path
-  vlan_ids            = ["2811"]
+  vlan_ids            = [var.segment_fa_vlan_id]
 }
+
+# LINE 57 - Uncomment lines 58-63 if using Fabric B uplinks 
+#resource "nsxt_policy_vlan_segment" "nsx-vlan-fb-seg" {
+#  display_name        = var.segment_fb_vlan_name
+#  description         = "VLAN Segment created by Terraform"
+#  transport_zone_path = data.nsxt_policy_transport_zone.vlan_tz.path
+#  vlan_ids            = [var.segment_fb_vlan_id]
+#}
 
 # Create Tier-0 Gateway
 resource "nsxt_policy_tier0_gateway" "tf-tier0-gw" {
@@ -91,7 +99,7 @@ resource "nsxt_policy_tier0_gateway_interface" "uplink_en1_fa" {
   type           = "EXTERNAL"
   edge_node_path = data.nsxt_policy_edge_node.edge_node_1.path
   gateway_path   = nsxt_policy_tier0_gateway.tf-tier0-gw.path
-  segment_path   = nsxt_policy_vlan_segment.nsx-vlan-2811-seg.path
+  segment_path   = nsxt_policy_vlan_segment.nsx-vlan-fa-seg.path
   subnets        = [var.uplink_en1_fa_ip]
   mtu            = var.tier0_uplink_mtu
 }
@@ -103,18 +111,50 @@ resource "nsxt_policy_tier0_gateway_interface" "uplink_en2_fa" {
   type           = "EXTERNAL"
   edge_node_path = data.nsxt_policy_edge_node.edge_node_2.path
   gateway_path   = nsxt_policy_tier0_gateway.tf-tier0-gw.path
-  segment_path   = nsxt_policy_vlan_segment.nsx-vlan-2811-seg.path
+  segment_path   = nsxt_policy_vlan_segment.nsx-vlan-fa-seg.path
   subnets        = [var.uplink_en2_fa_ip]
   mtu            = var.tier0_uplink_mtu
 }
 
+# LINE 119 - Uncomment lines 120-142 if using Fabric B uplinks 
+# Edge Node 1 - Fabric B - Router Port Configuration
+#resource "nsxt_policy_tier0_gateway_interface" "uplink_en1_fb" {
+#  display_name   = "uplink-en1-fb"
+#  description    = "Uplink Edge Node 1 - Fabric B"
+#  type           = "EXTERNAL"
+#  edge_node_path = data.nsxt_policy_edge_node.edge_node_1.path
+#  gateway_path   = nsxt_policy_tier0_gateway.tf-tier0-gw.path
+#  segment_path   = nsxt_policy_vlan_segment.nsx-vlan-fb-seg.path
+#  subnets        = [var.uplink_en1_fb_ip]
+#  mtu            = var.tier0_uplink_mtu
+#}
+
+# Edge Node 2 - Fabric B - Router Port Configuration
+#resource "nsxt_policy_tier0_gateway_interface" "uplink_en2_fb" {
+#  display_name   = "uplink-en1-fb"
+#  description    = "Uplink Edge Node 2 - Fabric A"
+#  type           = "EXTERNAL"
+#  edge_node_path = data.nsxt_policy_edge_node.edge_node_2.path
+#  gateway_path   = nsxt_policy_tier0_gateway.tf-tier0-gw.path
+#  segment_path   = nsxt_policy_vlan_segment.nsx-vlan-fb-seg.path
+#  subnets        = [var.uplink_en2_fb_ip]
+#  mtu            = var.tier0_uplink_mtu
+#}
+
 # Local definitions
 locals {
-  # Concatinate Uplink Source IP's for ToR-A Peering
+  # Concatinate Uplink Source IPs for ToR-A Peering
   peer_a_source_addresses = concat(
     nsxt_policy_tier0_gateway_interface.uplink_en1_fa.ip_addresses,
     nsxt_policy_tier0_gateway_interface.uplink_en2_fa.ip_addresses
   )
+
+# LINE 152 - Uncomment lines 154-157 if using Fabric B Networks 
+  # Concatinate Uplink Source IPs for ToR-B Peering 
+#  peer_b_source_addresses = concat(
+#    nsxt_policy_tier0_gateway_interface.uplink_en1_fb.ip_addresses,
+#    nsxt_policy_tier0_gateway_interface.uplink_en2_fb.ip_addresses
+#  )
 }
 
 # BGP Neighbor Configuration ToR-A
@@ -127,6 +167,18 @@ resource "nsxt_policy_bgp_neighbor" "router_a" {
   hold_down_time   = var.hold_down_time
   keep_alive_time  = var.keep_alive_time
 }
+
+# LINE 171 - Uncomment lines 173-181 if using Fabric B Networks 
+# BGP Neighbor Configuration ToR-B
+#resource "nsxt_policy_bgp_neighbor" "router_b" {
+#  display_name     = "ToR-B"
+#  description      = "Terraform provisioned BGP Neighbor Configuration"
+#  bgp_path         = nsxt_policy_tier0_gateway.tf-tier0-gw.bgp_config.0.path
+#  neighbor_address = var.router_b_ip
+#  remote_as_num    = var.router_b_remote_as
+#  hold_down_time   = var.hold_down_time
+#  keep_alive_time  = var.keep_alive_time
+#}
 
 # Create Tier-1 Gateway
 resource "nsxt_policy_tier1_gateway" "tf-tier1-gw" {
@@ -141,19 +193,6 @@ resource "nsxt_policy_tier1_gateway" "tf-tier1-gw" {
   # force_whitelisting        = "false"
   tier0_path                = nsxt_policy_tier0_gateway.tf-tier0-gw.path
   route_advertisement_types = ["TIER1_STATIC_ROUTES", "TIER1_CONNECTED"]
-
-  tag {
-    scope = "color"
-    tag   = "blue"
-  }
-
-  route_advertisement_rule {
-    name                      = "Tier 1 Networks"
-    action                    = "PERMIT"
-    subnets                   = ["10.16.80.0/24", "10.16.81.0/24", "10.16.82.0/24"]
-    prefix_operator           = "GE"
-    route_advertisement_types = ["TIER1_CONNECTED"]
-  }
 }
 
 # DHCP Server
@@ -174,12 +213,12 @@ resource "nsxt_policy_segment" "tf_segment_web" {
 
   subnet {
     cidr        = var.segment_web_cidr
-    dhcp_ranges = ["10.16.80.10-10.16.80.100"]
+    dhcp_ranges = [var.segment_web_dhcp_range]
 
     dhcp_v4_config {
-      server_address = "10.16.80.254/24"
+      server_address = var.segment_web_dhcp_server_address
       lease_time     = 86400
-      dns_servers    = ["172.16.11.50"]
+      dns_servers    = [var.segment_web_dhcp_dns_server]
     }
   }
 }
@@ -193,12 +232,12 @@ resource "nsxt_policy_segment" "tf_segment_app" {
 
   subnet {
     cidr        = var.segment_app_cidr
-    dhcp_ranges = ["10.16.81.10-10.16.81.100"]
+    dhcp_ranges = [var.segment_app_dhcp_range]
 
     dhcp_v4_config {
-      server_address = "10.16.81.254/24"
+      server_address = var.segment_app_dhcp_server_address
       lease_time     = 86400
-      dns_servers    = ["172.16.11.50"]
+      dns_servers    = [var.segment_app_dhcp_dns_server]
     }
   }
 }
@@ -212,12 +251,12 @@ resource "nsxt_policy_segment" "tf_segment_db" {
 
   subnet {
     cidr        = var.segment_db_cidr
-    dhcp_ranges = ["10.16.82.50-10.16.82.100"]
+    dhcp_ranges = [var.segment_db_dhcp_range]
 
     dhcp_v4_config {
-      server_address = "10.16.82.254/24"
+      server_address = var.segment_db_dhcp_server_address
       lease_time     = 86400
-      dns_servers    = ["172.16.11.50"]
+      dns_servers    = [var.segment_db_dhcp_dns_server]
     }
   }
 }
@@ -271,7 +310,7 @@ resource "nsxt_policy_group" "web_vip" {
 
   criteria {
     ipaddress_expression {
-      ip_addresses = ["10.16.0.4"]
+      ip_addresses = [var.web_vip_ip]
     }
   }
 }
@@ -282,7 +321,7 @@ resource "nsxt_policy_group" "app_vip" {
 
   criteria {
     ipaddress_expression {
-      ip_addresses = ["10.16.0.3"]
+      ip_addresses = [var.app_vip_ip]
     }
   }
 }
@@ -293,7 +332,7 @@ resource "nsxt_policy_group" "avi_se_data" {
 
   criteria {
     ipaddress_expression {
-      ip_addresses = ["10.16.21.0/24"]
+      ip_addresses = [var.avi_se_data_cidr]
     }
   }
 }
