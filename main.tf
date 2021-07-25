@@ -142,6 +142,11 @@ resource "nsxt_policy_tier1_gateway" "tf-tier1-gw" {
   tier0_path                = nsxt_policy_tier0_gateway.tf-tier0-gw.path
   route_advertisement_types = ["TIER1_STATIC_ROUTES", "TIER1_CONNECTED"]
 
+  tag {
+    scope = "color"
+    tag   = "blue"
+  }
+
   route_advertisement_rule {
     name                      = "Tier 1 Networks"
     action                    = "PERMIT"
@@ -347,18 +352,28 @@ resource "nsxt_policy_security_policy" "allow_3TA" {
   }
 
   rule {
-    display_name       = "Web to App Servers"
-    source_groups      = [nsxt_policy_group.web_servers.path, nsxt_policy_group.avi_se_data.path]
-    destination_groups = [nsxt_policy_group.app_servers.path, nsxt_policy_group.app_vip.path]
+    display_name       = "Web to App Server VIP"
+    source_groups      = [nsxt_policy_group.web_servers.path]
+    destination_groups = [nsxt_policy_group.app_vip.path]
     action             = "ALLOW"
     services           = [nsxt_policy_service.service_tcp8080.path]
     logged             = true
-    scope              = [nsxt_policy_group.web_servers.path, nsxt_policy_group.app_servers.path]
+    scope              = [nsxt_policy_group.web_servers.path]
+  }
+
+  rule {
+    display_name       = "NSX ALB SE to App Servers"
+    source_groups      = [nsxt_policy_group.avi_se_data.path]
+    destination_groups = [nsxt_policy_group.app_servers.path]
+    action             = "ALLOW"
+    services           = [nsxt_policy_service.service_tcp8080.path]
+    logged             = true
+    scope              = [nsxt_policy_group.app_servers.path]
   }
 
   rule {
     display_name       = "App to DB Servers"
-    source_groups      = [nsxt_policy_group.app_servers.path, nsxt_policy_group.avi_se_data.path]
+    source_groups      = [nsxt_policy_group.app_servers.path]
     destination_groups = [nsxt_policy_group.db_servers.path]
     action             = "ALLOW"
     services           = [data.nsxt_policy_service.mysql.path]
